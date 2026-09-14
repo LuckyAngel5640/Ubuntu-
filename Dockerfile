@@ -18,5 +18,30 @@ RUN sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config
 EXPOSE 5901
 EXPOSE 6080
 EXPOSE 22
-CMD bash -c "service ssh start && vncserver -localhost no -SecurityTypes None -geometry 1024x768 --I-KNOW-THIS-IS-INSECURE && openssl req -new -subj \"/C=JP\" -x509 -days 365 -nodes -out self.pem -keyout self.pem && websockify -D --web=/usr/share/novnc/ --cert=self.pem 6080 localhost:5901 && tail -f /dev/null"
+
+RUN mkdir -p /startup && cat > /startup/start.sh << 'EOF'
+#!/bin/bash
+set -e
+
+# Start SSH
+echo "Starting SSH..."
+service ssh start
+
+# Start VNC
+echo "Starting VNC server..."
+vncserver -localhost no -SecurityTypes None -geometry 1024x768 --I-KNOW-THIS-IS-INSECURE :1
+
+# Generate SSL cert
+echo "Generating SSL certificate..."
+openssl req -new -subj "/C=JP" -x509 -days 365 -nodes -out /tmp/self.pem -keyout /tmp/self.pem
+
+# Start websockify
+echo "Starting websockify on port 6080..."
+websockify --web=/usr/share/novnc/ --cert=/tmp/self.pem 6080 localhost:5901
+
+EOF
+
+RUN chmod +x /startup/start.sh
+
+CMD ["/startup/start.sh"]
 
